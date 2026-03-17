@@ -1,5 +1,4 @@
 # ---------------- PARCHE DE COMPATIBILIDAD ----------------
-# Esto es necesario para que DroneKit funcione en Python 3.10 o superior
 import collections
 if not hasattr(collections, 'MutableMapping'):
     import collections.abc
@@ -9,18 +8,24 @@ if not hasattr(collections, 'MutableMapping'):
 from dronekit import connect, VehicleMode
 import time
 import threading
+import os
 
 # ---------------- CONEXIÓN ----------------
 print("🔌 Conectando al simulador (Mission Planner SITL)...")
-# Asegúrate de que el SITL en Mission Planner esté usando el puerto 5763
 vehicle = connect('tcp:127.0.0.1:5763', wait_ready=True, timeout=60)
-print("✅ Conectado correctamente\n")
 
+# ---------------- FUNCIÓN PARA LIMPIAR PANTALLA ----------------
+def limpiar_pantalla():
+    # 'cls' para Windows, 'clear' para Linux/Mac
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-# ---------------- TELEMETRÍA ----------------
-def mostrar_telemetria():
+# ---------------- TELEMETRÍA (ACTUALIZADA) ----------------
+def mostrar_interfaz():
     while True:
         try:
+            limpiar_pantalla()
+            
+            # Datos del dron
             lat = vehicle.location.global_frame.lat
             lon = vehicle.location.global_frame.lon
             alt = vehicle.location.global_relative_frame.alt
@@ -28,86 +33,56 @@ def mostrar_telemetria():
             mode = vehicle.mode.name
             armed = vehicle.armed
 
-            print("\n📡 TELEMETRÍA DRON")
-            print(f" Latitud:   {lat:.6f}")
-            print(f" Longitud:  {lon:.6f}")
-            print(f" Altitud:   {alt:.1f} m")
-            print(f" Batería:   {batt if batt is not None else 'N/A'} %")
-            print(f" Modo:      {mode}")
-            print(f" Armado:    {'✅ Sí' if armed else '❌ No'}")
+            print("=" * 45)
+            print(f"📡 ESTATUS DEL DRON EN TIEMPO REAL")
+            print("=" * 45)
+            print(f" 📍 Posición:  {lat:.6f}, {lon:.6f}")
+            print(f" 📏 Altitud:   {alt:.1f} m")
+            print(f" 🔋 Batería:   {batt if batt is not None else 'N/A'} %")
+            print(f" 🕹️  Modo:      {mode}")
+            print(f" 🛡️  Armado:    {'✅ SÍ' if armed else '❌ NO'}")
+            print("=" * 45)
+            
+            # Mostrar el menú fijo abajo
+            print("\n🎮 MENÚ DE CONTROL INTERACTIVO")
+            print(" [1] STABILIZE   [2] LOITER   [3] AUTO (+Throttle)")
+            print(" [4] LAND        [5] ARMAR    [6] DESARMAR")
+            print(" [0] SALIR")
             print("-" * 45)
+            print("Escribe una opción y presiona Enter: ", end="", flush=True)
+
         except Exception as e:
-            print(f"⚠️ Error leyendo telemetría: {e}")
+            print(f"⚠️ Error: {e}")
         
-        time.sleep(2)
+        time.sleep(2) # Se actualiza cada 2 segundos
 
-
-# ---------------- CAMBIO DE MODO ----------------
+# ---------------- LÓGICA DE CONTROL ----------------
 def cambiar_modo(nuevo_modo):
-    print(f"🔄 Cambiando a modo {nuevo_modo}...")
     vehicle.mode = VehicleMode(nuevo_modo)
 
-    while vehicle.mode.name != nuevo_modo:
-        print("⏳ Esperando cambio de modo...")
-        time.sleep(1)
-
-    print(f"✅ Modo cambiado a {nuevo_modo}")
-
-
-# ---------------- AUTO + THROTTLE OVERRIDE ----------------
 def auto_con_throttle():
     cambiar_modo("AUTO")
-
-    print("🚀 Aplicando throttle override...")
-    # 1600–1700 suele ser suficiente en quad
     vehicle.channels.overrides['3'] = 1650  
-    
-    time.sleep(5)  # mantener 5 segundos
-    
-    print("🔓 Liberando override de throttle...")
+    time.sleep(5)
     vehicle.channels.overrides['3'] = None
 
-
-# ---------------- ARMAR / DESARMAR ----------------
 def armar_dron():
-    if not vehicle.is_armable:
-        print("⚠️ El dron no está listo para armar (Verifica Pre-Arm checks en MP).")
-        return
-
-    print("🟢 Armando dron...")
-    vehicle.armed = True
-
-    while not vehicle.armed:
-        print("⏳ Esperando armado...")
-        time.sleep(1)
-
-    print("✅ Dron armado correctamente")
-
+    if vehicle.is_armable:
+        vehicle.armed = True
 
 def desarmar_dron():
-    print("🔴 Desarmando dron...")
     vehicle.armed = False
 
-    while vehicle.armed:
-        print("⏳ Esperando desarmado...")
-        time.sleep(1)
+# ---------------- MAIN ----------------
+if __name__ == "__main__":
+    # Iniciamos la interfaz en un hilo
+    hilo_interfaz = threading.Thread(target=mostrar_interfaz)
+    hilo_interfaz.daemon = True
+    hilo_interfaz.start()
 
-    print("✅ Dron desarmado")
-
-
-# ---------------- MENÚ INTERACTIVO ----------------
-def menu_control():
     while True:
-        print("\n🎮 MENÚ CONTROL")
-        print("1 → STABILIZE")
-        print("2 → LOITER")
-        print("3 → AUTO (con throttle)")
-        print("4 → LAND")
-        print("5 → ARMAR")
-        print("6 → DESARMAR")
-        print("0 → SALIR")
-
-        opcion = input("Selecciona opción: ")
+        # El input ahora solo espera la opción sin imprimir texto extra
+        opcion = input()
 
         if opcion == "1":
             cambiar_modo("STABILIZE")
@@ -122,18 +97,6 @@ def menu_control():
         elif opcion == "6":
             desarmar_dron()
         elif opcion == "0":
-            print("🔴 Cerrando conexión...")
+            print("\n🔴 Cerrando conexión...")
             vehicle.close()
             break
-        else:
-            print("❌ Opción inválida")
-
-
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    # Iniciar el hilo de telemetría en segundo plano
-    hilo_telemetria = threading.Thread(target=mostrar_telemetria)
-    hilo_telemetria.daemon = True
-    hilo_telemetria.start()
-
-    menu_control()
