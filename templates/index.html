@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>UAV-DataStack</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <style>
+        body { margin:0; display:flex; }
+        #map { height:100vh; width:75%; }
+        #sidebar { width:25%; padding:10px; background:#111; color:#fff; }
+        .chart-container { height:200px; }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebar">
+    <h2>UAV</h2>
+
+    <div id="mision-tag">ESPERANDO</div>
+
+    <p>Altitud: <span id="alt-val">0</span></p>
+    <p>Modo: <span id="modo-val">---</span></p>
+
+    <div class="chart-container">
+        <canvas id="batteryChart"></canvas>
+    </div>
+
+    <button onclick="stabilize()">STAB</button>
+    <button onclick="loiter()">LOIT</button>
+    <button onclick="autoMode()">AUTO</button>
+    <button onclick="land()">LAND</button>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- ✅ SOCKET.IO COMPATIBLE -->
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+</body>
+</html>
