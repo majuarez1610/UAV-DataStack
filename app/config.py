@@ -7,6 +7,7 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///telemetria.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     ACCESS_TOKEN = os.getenv('ACCESS_TOKEN', '')  # intentionally may be empty
+    UAV_CONNECTION = os.getenv('UAV_CONNECTION', 'tcp:127.0.0.1:5763')
     HOST = os.getenv('HOST', '0.0.0.0')
     PORT = int(os.getenv('PORT', 5000))
     DEBUG = os.getenv('FLASK_DEBUG', '0') == '1'

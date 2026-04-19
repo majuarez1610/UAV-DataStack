@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request, current_app
 from app.utils.auth import require_token
 from app.repositories import mission_repo, telemetry_repo
+from flask import current_app, Response
+from app.services.video_service import VideoService
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -39,3 +41,17 @@ def stop_mission():
     if not ok:
         return jsonify({'ok': False, 'error': 'mission not found'}), 404
     return jsonify({'ok': True}), 200
+
+
+@api_bp.route('/api/video/status', methods=['GET'])
+def video_status():
+    # lightweight: try to use a VideoService instance if available, otherwise report false
+    try:
+        vs = VideoService(current_app.config.get('VIDEO_SOURCE', 0))
+        # do not start capture here; just report availability by attempting to open/close quickly
+        vs.start()
+        st = vs.status()
+        vs.stop()
+        return jsonify({'ok': True, 'video': st}), 200
+    except Exception:
+        return jsonify({'ok': True, 'video': {'available': False}}), 200

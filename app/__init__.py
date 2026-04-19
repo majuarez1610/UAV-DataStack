@@ -6,6 +6,7 @@ def create_app(config_object=None):
     from .extensions import db, socketio, cors
     from .api.routes import api_bp
     from .sockets.handlers import register_socket_handlers
+    from .api.video_routes import video_bp
 
     app = Flask(__name__, static_folder="static", template_folder="templates")
 
@@ -25,6 +26,7 @@ def create_app(config_object=None):
 
     # Register Blueprints
     app.register_blueprint(api_bp)
+    app.register_blueprint(video_bp)
 
     # Register socket handlers (pass socketio later)
     register_socket_handlers(app)
