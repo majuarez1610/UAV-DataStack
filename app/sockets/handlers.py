@@ -29,11 +29,20 @@ def register_socket_handlers(app):
     # Allow control commands via socket (authorized clients)
     @socketio.on('control.command', namespace='/control')
     def on_control_command(data):
-        # Basic acknowledgement; actual control service will handle commands in next phase
+        # Forward command to ControlService
         current_app.logger.info(f"Received control.command: {data}")
         try:
+            from app.extensions import control_service as cs
             action = data.get('action')
-            socketio.emit('control.ack', {'ok': True, 'action': action, 'message': 'Received'}, namespace='/control')
+            if action == 'arm':
+                res = cs.arm()
+            elif action == 'disarm':
+                res = cs.disarm()
+            elif action == 'mode':
+                res = cs.set_mode(data.get('params', {}).get('mode'))
+            else:
+                res = {'ok': False, 'message': 'unknown action'}
+            socketio.emit('control.ack', {'ok': res.get('ok', False), 'action': action, 'message': res.get('message')}, namespace='/control')
         except Exception as e:
             current_app.logger.exception('Error handling control.command')
             socketio.emit('control.ack', {'ok': False, 'message': str(e)}, namespace='/control')
