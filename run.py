@@ -18,7 +18,7 @@ def start_background_services(app):
     provider_name = app.config.get('TELEMETRY_PROVIDER', 'simulated')
     if provider_name == 'simulated':
         provider = SimulatedProvider(interval=float(app.config.get('TELEMETRY_PERSIST_INTERVAL', 1)))
-        telemetry_service = TelemetryService(provider=provider, mission_id=None)
+        telemetry_service = TelemetryService(provider=provider, mission_id=None, app=app)
         telemetry_service.start()
         app.logger.info("Simulated telemetry provider started (development)")
     else:

@@ -6,9 +6,11 @@ from datetime import datetime
 _logger = logging.getLogger(__name__)
 
 class TelemetryService:
-    def __init__(self, provider, mission_id=None):
+    def __init__(self, provider, mission_id=None, app=None):
         self.provider = provider
         self.mission_id = mission_id
+        # optional Flask app instance to create application context when running in background threads
+        self.app = app
 
     def start(self):
         self.provider.register_callback(self.on_data)
@@ -28,14 +30,15 @@ class TelemetryService:
         elif ts is None:
             data['timestamp'] = datetime.utcnow()
 
-        # Persist (best effort)
+        # Persist and emit inside application context if an app was provided
         try:
-            save_telemetry(self.mission_id, data)
+            if self.app:
+                with self.app.app_context():
+                    save_telemetry(self.mission_id, data)
+                    socketio.emit('telemetry.update', data, namespace='/telemetry')
+            else:
+                # best effort without explicit app context
+                save_telemetry(self.mission_id, data)
+                socketio.emit('telemetry.update', data, namespace='/telemetry')
         except Exception:
-            _logger.exception("Failed to save telemetry")
-
-        # Emit to clients
-        try:
-            socketio.emit('telemetry.update', data, namespace='/telemetry')
-        except Exception:
-            _logger.exception("Failed to emit telemetry")
+            _logger.exception("Failed to save or emit telemetry")
