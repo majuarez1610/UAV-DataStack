@@ -31,3 +31,4 @@ SQLAlchemy>=1.4
 Flask-SQLAlchemy>=3.0
 python-dotenv>=1.0.0
 Flask-Cors>=3.0.10
+Flask-Limiter>=2.0

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 <body>
   <div id="container">
@@ -23,7 +24,7 @@
       <section class="card">
         <h3>Video</h3>
         <div id="video-panel">
-          <img id="videoFeed" src="/video_feed" alt="Video Feed" onerror="showVideoPlaceholder()" />
+          <img id="videoFeed" src="" alt="Video Feed" onerror="showVideoPlaceholder()" />
           <div id="video-placeholder" class="hidden">Cámara no disponible</div>
         </div>
       </section>
@@ -49,6 +50,18 @@
         </div>
         <div class="small">Introduce token para habilitar controles</div>
       </section>
+
+      <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+          <h3>Autenticación</h3>
+          <input id="login-user" placeholder="Usuario" />
+          <input id="login-pass" type="password" placeholder="Contraseña" />
+          <div class="modal-actions">
+            <button id="login-submit" class="btn">Login</button>
+            <button id="login-cancel" class="btn">Cancelar</button>
+          </div>
+        </div>
+      </div>
 
     </aside>
 

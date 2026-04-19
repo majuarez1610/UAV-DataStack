@@ -51,7 +51,40 @@ const btnLand = document.getElementById('btn-land');
 function hasToken(){ return !!sessionStorage.getItem('uav_token'); }
 function enableControls(enabled){ [btnArm,btnDisarm,btnAuto,btnLand].forEach(b=>b.disabled=!enabled) }
 
-if(hasToken()) enableControls(true);
+if(hasToken()){
+    enableControls(true);
+    // set video src with token
+    const t = sessionStorage.getItem('uav_token');
+    document.getElementById('videoFeed').src = `/video_feed?access_token=${encodeURIComponent(t)}`;
+} else {
+    // show login modal
+    document.getElementById('login-modal').classList.remove('hidden');
+}
+
+async function doLogin(){
+    const user = document.getElementById('login-user').value;
+    const pass = document.getElementById('login-pass').value;
+    if(!user || !pass) { alert('Usuario y contraseña requeridos'); return; }
+    try{
+        const res = await fetch('/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username: user, password: pass})});
+        const j = await res.json();
+        if(j.ok && j.token){
+            sessionStorage.setItem('uav_token', j.token);
+            document.getElementById('login-modal').classList.add('hidden');
+            enableControls(true);
+            document.getElementById('videoFeed').src = `/video_feed?access_token=${encodeURIComponent(j.token)}`;
+            alert('Autenticación OK');
+        } else {
+            alert('Login fallido: ' + (j.error || JSON.stringify(j)));
+        }
+    }catch(e){
+        alert('Error en login');
+        console.error(e);
+    }
+}
+
+document.getElementById('login-submit').addEventListener('click', doLogin);
+document.getElementById('login-cancel').addEventListener('click', ()=>{ document.getElementById('login-modal').classList.add('hidden'); });
 
 btnArm.addEventListener('click', async ()=>{
     if(!confirm('Confirmar ARM?')) return;
@@ -63,9 +96,3 @@ btnArm.addEventListener('click', async ()=>{
 
 // follow toggle when user drags map
 map.on('dragstart', ()=>{ follow = false });
-
-// small token prompt
-if(!hasToken()){
-    const t = prompt('Introduce ACCESS_TOKEN para habilitar controles (deja vacío para modo sólo lectura):');
-    if(t){ sessionStorage.setItem('uav_token', t); enableControls(true); }
-}

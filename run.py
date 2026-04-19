@@ -3,8 +3,10 @@ load_dotenv()
 
 from app import create_app
 from app.extensions import socketio
-from app.services.providers.simulated_provider import SimulatedProvider
 from app.services.telemetry_service import TelemetryService
+from app import extensions as _ext
+from app.services.providers.simulated_provider import SimulatedProvider
+from app.services.providers.dronekit_provider import DroneKitProvider
 import logging
 
 app = create_app()
@@ -22,7 +24,20 @@ def start_background_services(app):
         telemetry_service.start()
         app.logger.info("Simulated telemetry provider started (development)")
     else:
-        app.logger.info(f"Telemetry provider set to {provider_name}; not auto-started here.")
+        # If configured for dronekit and in development, auto-start provider to ease testing
+        if provider_name == 'dronekit':
+            conn = app.config.get('UAV_CONNECTION')
+            provider = DroneKitProvider(connection_string=conn, interval=float(app.config.get('TELEMETRY_PERSIST_INTERVAL', 1)))
+            telemetry_service = TelemetryService(provider=provider, mission_id=None, app=app)
+            telemetry_service.start()
+            # attach provider to control_service so it can access vehicle
+            try:
+                _ext.control_service.provider = provider
+            except Exception:
+                app.logger.exception('Failed to attach dronekit provider to control_service')
+            app.logger.info(f"DroneKit telemetry provider started (development) -> {conn}")
+        else:
+            app.logger.info(f"Telemetry provider set to {provider_name}; not auto-started here.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

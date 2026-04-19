@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, current_app
 from app.utils.auth import require_token
 from app.repositories import mission_repo, telemetry_repo
 from flask import current_app, Response
-from app.services.video_service import VideoService
+from app.utils.auth import require_token
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -21,6 +21,32 @@ def list_missions():
     ms = mission_repo.list_missions()
     out = [{'id': m.id, 'name': m.name, 'status': m.status, 'start_ts': m.start_ts, 'end_ts': m.end_ts} for m in ms]
     return jsonify({'ok': True, 'data': out}), 200
+
+
+@api_bp.route('/telemetry/latest', methods=['GET'])
+def telemetry_latest():
+    try:
+        t = telemetry_repo.latest(limit=20)
+        out = []
+        for item in t:
+            out.append({
+                'id': item.id,
+                'mission_id': item.mission_id,
+                'timestamp': item.timestamp.isoformat() if item.timestamp else None,
+                'lat': item.lat,
+                'lon': item.lon,
+                'alt': item.alt,
+                'mode': item.mode,
+                'voltage': item.voltage,
+                'current': item.current,
+                'speed': item.speed,
+                'heading': item.heading,
+                'source': item.source,
+            })
+        return jsonify({'ok': True, 'data': out}), 200
+    except Exception:
+        current_app.logger.exception('Failed to get latest telemetry')
+        return jsonify({'ok': False, 'error': 'internal error'}), 500
 
 @api_bp.route('/missions/start', methods=['POST'])
 @require_token
@@ -43,15 +69,16 @@ def stop_mission():
     return jsonify({'ok': True}), 200
 
 
-@api_bp.route('/api/video/status', methods=['GET'])
+@api_bp.route('/video/status', methods=['GET'])
 def video_status():
-    # lightweight: try to use a VideoService instance if available, otherwise report false
+    # Report status of singleton VideoService if present
     try:
-        vs = VideoService(current_app.config.get('VIDEO_SOURCE', 0))
-        # do not start capture here; just report availability by attempting to open/close quickly
-        vs.start()
+        from app import extensions as _ext
+        vs = getattr(_ext, 'video_service', None)
+        if not vs:
+            return jsonify({'ok': True, 'video': {'available': False}}), 200
         st = vs.status()
-        vs.stop()
         return jsonify({'ok': True, 'video': st}), 200
     except Exception:
+        current_app.logger.exception('video_status check failed')
         return jsonify({'ok': True, 'video': {'available': False}}), 200

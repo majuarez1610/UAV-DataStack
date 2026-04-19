@@ -5,6 +5,7 @@ def create_app(config_object=None):
     from .config import DevConfig, ProdConfig, TestConfig
     from .extensions import db, socketio, cors
     from .api.routes import api_bp
+    from .api.auth_routes import auth_bp
     from .sockets.handlers import register_socket_handlers
     from .api.video_routes import video_bp
     from .api.control_routes import control_bp
@@ -21,16 +22,18 @@ def create_app(config_object=None):
         app.config.from_object(DevConfig)
 
     # Initialize extensions
+    from .extensions import db, cors, socketio
     db.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": app.config.get('CORS_ORIGINS', '*')}})
     socketio.init_app(app, cors_allowed_origins=app.config.get('CORS_ORIGINS', '*'))
 
     # Register Blueprints
     app.register_blueprint(api_bp)
+    app.register_blueprint(auth_bp)
     app.register_blueprint(video_bp)
     app.register_blueprint(control_bp)
 
-    # Register socket handlers (pass socketio later)
+    # Register socket handlers (socketio already initialised)
     register_socket_handlers(app)
 
     # Ensure DB tables exist (safe in dev)
@@ -41,18 +44,16 @@ def create_app(config_object=None):
             app.logger.exception("DB create_all failed")
 
     # initialize runtime services: video and control singleton instances
+    # create and attach a persistent VideoService and ControlService (stored on app.extensions module)
     from .services.video_service import VideoService
     from .services.control_service import ControlService
-    from .extensions import video_service as vs_holder, control_service as cs_holder
-    # create and attach a persistent VideoService and ControlService
+    import app.extensions as _ext
     vs_inst = VideoService(app.config.get('VIDEO_SOURCE', 0))
-    # store on extensions module (mutable)
     try:
         vs_inst.start()
     except Exception:
         app.logger.exception('Failed to start VideoService')
-    # assign
-    import app.extensions as _ext
+    # store instances on extension holders
     _ext.video_service = vs_inst
     _ext.control_service = ControlService()
 

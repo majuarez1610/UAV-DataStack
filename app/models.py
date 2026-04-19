@@ -49,3 +49,11 @@ class EventLog(db.Model):
     type = db.Column(db.String(64))
     message = db.Column(db.Text)
     data = db.Column(db.JSON)
+
+
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
