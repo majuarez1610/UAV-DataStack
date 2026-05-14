@@ -1,10 +1,36 @@
+import collections
+import collections.abc
+import logging
 import threading
 import time
-import logging
 from datetime import datetime
+
 from app.services.providers.base import TelemetryProvider
 
 _logger = logging.getLogger(__name__)
+
+
+def _patch_py313_for_dronekit():
+    aliases = [
+        "Mapping",
+        "MutableMapping",
+        "Sequence",
+        "MutableSequence",
+        "Set",
+        "MutableSet",
+        "Iterable",
+        "Iterator",
+    ]
+    for name in aliases:
+        if not hasattr(collections, name) and hasattr(collections.abc, name):
+            setattr(collections, name, getattr(collections.abc, name))
+
+    try:
+        import inspect
+        if not hasattr(inspect, "getargspec"):
+            inspect.getargspec = inspect.getfullargspec
+    except Exception:
+        pass
 
 
 class DroneKitProvider(TelemetryProvider):
@@ -34,7 +60,6 @@ class DroneKitProvider(TelemetryProvider):
             self._thread.join(timeout=1)
         try:
             if self.vehicle:
-                # attempt graceful close
                 try:
                     self.vehicle.close()
                 except Exception:
@@ -44,18 +69,48 @@ class DroneKitProvider(TelemetryProvider):
 
     @property
     def status(self):
-        return 'connected' if self.vehicle is not None else 'disconnected'
+        return "connected" if self.vehicle is not None else "disconnected"
 
     def _connect(self):
         try:
-            # lazy import to avoid hard dependency if not used
+            _patch_py313_for_dronekit()
             from dronekit import connect
-            _logger.info(f"Connecting to vehicle at {self.connection_string}")
-            v = connect(self.connection_string, wait_ready=True, heartbeat_timeout=30)
-            return v
+            _logger.info("Connecting to vehicle at %s", self.connection_string)
+            return connect(self.connection_string, wait_ready=True, heartbeat_timeout=60)
         except Exception:
-            _logger.exception('DroneKit connect failed')
+            _logger.exception("DroneKit connect failed")
             return None
+
+    def _payload_from_vehicle(self, v):
+        frame = getattr(v.location, "global_relative_frame", None) or getattr(v.location, "global_frame", None)
+        lat = getattr(frame, "lat", None) if frame else None
+        lon = getattr(frame, "lon", None) if frame else None
+        alt = getattr(frame, "alt", None) if frame else None
+
+        batt = getattr(v, "battery", None)
+        voltage = getattr(batt, "voltage", None) if batt else None
+        current = getattr(batt, "current", None) if batt else None
+
+        mode = getattr(v, "mode", None)
+        if hasattr(mode, "name"):
+            mode = mode.name
+        elif mode is not None:
+            mode = str(mode)
+
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "lat": lat,
+            "lon": lon,
+            "alt": alt,
+            "mode": mode,
+            "voltage": voltage,
+            "current": current,
+            "speed": getattr(v, "groundspeed", None) or getattr(v, "airspeed", None),
+            "heading": getattr(v, "heading", None) if hasattr(v, "heading") else None,
+            "connection_state": "connected",
+            "source": "dronekit",
+        }
+        return payload
 
     def _loop(self):
         backoff = 1
@@ -66,65 +121,34 @@ class DroneKitProvider(TelemetryProvider):
                     with self._lock:
                         self.vehicle = v
                     backoff = 1
-                    _logger.info('DroneKit vehicle connected')
+                    _logger.info("DroneKit vehicle connected")
                 else:
-                    _logger.warning(f'DroneKit connect failed, retrying in {backoff}s')
+                    _logger.warning("DroneKit connect failed, retrying in %ss", backoff)
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 30)
                     continue
 
-            # read telemetry and send to callbacks
             try:
                 with self._lock:
                     v = self.vehicle
                 if not v:
                     time.sleep(self.interval)
                     continue
-                # gather common fields, guard for attribute access
-                lat = getattr(v.location.global_frame, 'lat', None)
-                lon = getattr(v.location.global_frame, 'lon', None)
-                alt = getattr(v.location.global_frame, 'alt', None)
-                mode = getattr(v, 'mode', None)
-                voltage = None
-                current = None
-                # attempt to read battery info
-                try:
-                    batt = getattr(v, 'battery', None)
-                    if batt:
-                        voltage = getattr(batt, 'voltage', None)
-                except Exception:
-                    pass
 
-                payload = {
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'lat': lat,
-                    'lon': lon,
-                    'alt': alt,
-                    'mode': str(mode) if mode is not None else None,
-                    'voltage': voltage,
-                    'current': current,
-                    'speed': getattr(v, 'airspeed', None) or getattr(v, 'groundspeed', None),
-                    'heading': getattr(v, 'heading', None) if hasattr(v, 'heading') else None,
-                    'connection_state': 'connected',
-                    'source': 'dronekit',
-                }
-
+                payload = self._payload_from_vehicle(v)
                 for cb in list(self._callbacks):
                     try:
                         cb(payload)
                     except Exception:
-                        _logger.exception('DroneKitProvider callback error')
-
+                        _logger.exception("DroneKitProvider callback error")
                 time.sleep(self.interval)
             except Exception:
-                _logger.exception('Error in DroneKitProvider loop; clearing vehicle and attempting reconnect')
-                try:
-                    with self._lock:
-                        if self.vehicle:
-                            try:
-                                self.vehicle.close()
-                            except Exception:
-                                pass
-                            self.vehicle = None
-                finally:
-                    time.sleep(1)
+                _logger.exception("Error in DroneKitProvider loop; clearing vehicle and attempting reconnect")
+                with self._lock:
+                    if self.vehicle:
+                        try:
+                            self.vehicle.close()
+                        except Exception:
+                            pass
+                        self.vehicle = None
+                time.sleep(1)
