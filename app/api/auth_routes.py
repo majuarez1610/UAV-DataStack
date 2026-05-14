@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from app.models import User
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.extensions import db
-from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+from itsdangerous import URLSafeTimedSerializer as Serializer
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -32,6 +32,6 @@ def login():
     u = User.query.filter_by(username=username).first()
     if not u or not check_password_hash(u.password_hash, password):
         return jsonify({'ok': False, 'error': 'invalid credentials'}), 401
-    s = Serializer(current_app.config.get('SECRET_KEY'), expires_in=3600)
-    token = s.dumps({'user_id': u.id}).decode('utf-8')
+    s = Serializer(current_app.config.get('SECRET_KEY'))
+    token = s.dumps({'user_id': u.id})
     return jsonify({'ok': True, 'token': token}), 200
