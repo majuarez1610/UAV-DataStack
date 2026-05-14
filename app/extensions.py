@@ -9,6 +9,3 @@ cors = CORS()
 # runtime service placeholders (set by application factory)
 video_service = None
 control_service = None
-# runtime service placeholders (to be set by application factory)
-video_service = None
-control_service = None
