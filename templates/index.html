@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>UAV-DataStack — Dashboard</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UAV DataStack Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -24,7 +24,7 @@
       <section class="card">
         <h3>Video</h3>
         <div id="video-panel">
-          <img id="videoFeed" src="" alt="Video Feed" onerror="showVideoPlaceholder()" />
+          <img id="videoFeed" src="" alt="Video Feed" />
           <div id="video-placeholder" class="hidden">Cámara no disponible</div>
         </div>
       </section>
@@ -32,12 +32,14 @@
       <section class="card">
         <h3>Métricas</h3>
         <div class="data-grid">
-          <div>Altitud<br/><span class="data" id="alt-val">0</span></div>
-          <div>Modo<br/><span class="data" id="modo-val">---</span></div>
-          <div>Voltaje<br/><span class="data" id="volt-val">0</span></div>
-          <div>Corriente<br/><span class="data" id="current-val">0</span></div>
+          <div>Altitud<br><span class="data" id="alt-val">0</span></div>
+          <div>Modo<br><span class="data" id="modo-val">---</span></div>
+          <div>Voltaje<br><span class="data" id="volt-val">0</span></div>
+          <div>Corriente<br><span class="data" id="current-val">0</span></div>
         </div>
-        <div class="chart-container"><canvas id="batteryChart"></canvas></div>
+        <div class="chart-container">
+          <canvas id="batteryChart"></canvas>
+        </div>
       </section>
 
       <section class="card">
@@ -45,10 +47,12 @@
         <div class="control-grid">
           <button id="btn-arm" class="btn danger" disabled>ARM</button>
           <button id="btn-disarm" class="btn" disabled>DISARM</button>
+          <button id="btn-stabilize" class="btn" disabled>STABILIZE</button>
           <button id="btn-auto" class="btn" disabled>AUTO</button>
           <button id="btn-land" class="btn" disabled>LAND</button>
+          <button id="btn-mission-start" class="btn accent" disabled>MISSION START</button>
         </div>
-        <div class="small">Introduce token para habilitar controles</div>
+        <div id="app-message" class="small">Inicia sesión para habilitar controles</div>
       </section>
 
       <div id="login-modal" class="modal hidden">
@@ -56,13 +60,13 @@
           <h3>Autenticación</h3>
           <input id="login-user" placeholder="Usuario" />
           <input id="login-pass" type="password" placeholder="Contraseña" />
+          <div id="login-message" class="small"></div>
           <div class="modal-actions">
             <button id="login-submit" class="btn">Login</button>
             <button id="login-cancel" class="btn">Cancelar</button>
           </div>
         </div>
       </div>
-
     </aside>
 
     <main id="main">
